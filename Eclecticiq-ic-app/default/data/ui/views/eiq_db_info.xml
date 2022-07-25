@@ -1,0 +1,482 @@
+<form version="1.1">
+  <label>Observables DB Info</label>
+  <fieldset submitButton="false">
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="feed_token">
+      <label>Select feed</label>
+      <choice value="*">All</choice>
+      <prefix>feed_id="</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>feed_id</fieldForLabel>
+      <fieldForValue>feed_id</fieldForValue>
+      <search>
+        <query>| inputlookup eiq_entities_list | dedup feed_id | table feed_id</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="multiselect" token="token_meta">
+      <label>Tags</label>
+      <fieldForLabel>meta_tags</fieldForLabel>
+      <fieldForValue>meta_tags</fieldForValue>
+      <search>
+        <query>| inputlookup eiq_entities_list 
+| eval meta_tags= trim(split(meta_tags,",")) 
+| search meta_tags!="" 
+| mvexpand meta_tags 
+| dedup meta_tags 
+| table meta_tags</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+      <delimiter> OR </delimiter>
+      <choice value="*">All</choice>
+      <prefix>meta_tags="</prefix>
+      <suffix>"</suffix>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Total Count of Observables in Splunk</title>
+      <single>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time)
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| stats distinct_count(id_eiq)</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x65a637","0x65a637"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Observables Distribution</title>
+      <table>
+        <search>
+          <query>| inputlookup eiq_entities_list where $feed_token$
+| eval meta_tags= trim(split(meta_tags,",")) 
+| mvexpand meta_tags 
+| search $token_meta$
+| eval observable_ids=trim(split(observable_ids,",")) 
+| mvexpand observable_ids 
+| eval entity_id = _key 
+| table feed_id ,entity_id,observable_ids 
+| join entity_id type=left max=0 
+    [| inputlookup eiq_ioc_list 
+    | eval entity_id=trim(split(entity_id,",")) 
+    | mvexpand entity_id 
+    | eval obs_id=id_eiq] 
+| addinfo 
+| eval timestamp_eiq=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time)
+| where timestamp_eiq&gt;= info_min_time and timestamp_eiq&lt;= info_max_time 
+| stats distinct_count(obs_id) as observables by feed_id 
+| append 
+    [| inputlookup eiq_entities_list where $feed_token$
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$
+    | eval entity_id = _key 
+    | eval timestamp_eiq=strptime(last_updated_at, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+    | addinfo 
+    | eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time)
+    | where timestamp_eiq&gt;= info_min_time and timestamp_eiq&lt;= info_max_time 
+    | stats distinct_count(entity_id) as entities by feed_id]
+    |stats sum(observables) as observables sum(entities) as entities by feed_id</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="totalsRow">false</option>
+        <format type="color" field="Update Strategy">
+          <colorPalette type="map">{"N/A - this feed isn't mentioned in settings":#F8BE34}</colorPalette>
+        </format>
+        <format type="color" field="Feed Name">
+          <colorPalette type="map">{"N/A - this feed isn't mentioned in settings":#F8BE34}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Downloaded Observables by time</title>
+      <chart>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time)
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| timechart distinct_count(id_eiq) by feed_id</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Downloaded Observables by Time and Type</title>
+      <chart>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time)
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| timechart distinct_count(id_eiq) by  type_eiq</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Count of Observables by Type</title>
+      <chart>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$ 
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$ 
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time) 
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| stats distinct_count(id_eiq) as "count" by type_eiq 
+| sort - count</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <table id="eiq_table_highlight_00">
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$ 
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$ 
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time) 
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| stats distinct_count(id_eiq) as "count" by type_eiq 
+| sort - count 
+| rename type_eiq as "Observable-Type" count as Count</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">search?q=%7C%20inputlookup%20eiq_ioc_list%20where%20type_eiq%3D$row.Observable-Type$%0A%7C%20addinfo%20%0A%7C%20eval%20_time%3Dstrptime(last_updated_at_eiq%2C%20%22%25Y-%25m-%25dT%25H%3A%25M%3A%25S.%256N%25%3Az%22)%20%0A%7C%20eval%20info_max_time%3D%20case(info_max_time%3D%22%2BInfinity%22%2Cstrftime(now()%2C%22%25s%22)%2C1%3D1%2Cinfo_max_time)%20%0A%7C%20where%20_time%3E%3D%20info_min_time%20and%20_time%3C%3D%20info_max_time&amp;earliest=$field1.earliest$&amp;latest=$field1.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <title>Count of Observables by Tags</title>
+      <chart>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$ 
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$ 
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq,meta_tags ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time) 
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| eval meta_tags=case(meta_tags!="",meta_tags,1=1,"N/A") 
+| stats distinct_count(id_eiq) as "count" by meta_tags 
+| sort - count</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <table id="eiq_table_highlight_02">
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$ 
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$ 
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq,meta_tags ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time) 
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| eval meta_tags=case(meta_tags!="",meta_tags,1=1,"N/A") 
+| stats distinct_count(id_eiq) as "count" by meta_tags 
+| sort - count
+| rename meta_tags AS "Tags"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">search?q=%7C%20inputlookup%20eiq_ioc_list%20%0A%7C%20eval%20entity_id%3Dtrim(split(entity_id%2C%22%2C%22))%20%0A%7C%20mvexpand%20entity_id%20%0A%7C%20join%20entity_id%20type%3Dinner%20max%3D0%20%0A%20%20%20%20%5B%7C%20inputlookup%20eiq_entities_list%20where%20$feed_token$%20%0A%20%20%20%20%7C%20eval%20observable_ids%3Dtrim(split(observable_ids%2C%22%2C%22))%20%0A%20%20%20%20%7C%20mvexpand%20observable_ids%20%0A%20%20%20%20%7C%20eval%20meta_tags%3D%20trim(split(meta_tags%2C%22%2C%22))%20%0A%20%20%20%20%7C%20mvexpand%20meta_tags%20%0A%20%20%20%20%7C%20search%20$token_meta$%20%0A%20%20%20%20%7C%20eval%20entity_id%20%3D%20_key%20%0A%20%20%20%20%7C%20table%20feed_id%20%2Centity_id%2Cobservable_ids%2Cid_eiq%2Cmeta_tags%20%5D%20%0A%7C%20addinfo%20%0A%7C%20eval%20_time%3Dstrptime(last_updated_at_eiq%2C%20%22%25Y-%25m-%25dT%25H%3A%25M%3A%25S.%256N%25%3Az%22)%20%0A%7C%20eval%20info_max_time%3D%20case(info_max_time%3D%22%2BInfinity%22%2Cstrftime(now()%2C%22%25s%22)%2C1%3D1%2Cinfo_max_time)%20%0A%7C%20where%20_time%3E%3D%20info_min_time%20and%20_time%3C%3D%20info_max_time%20%0A%7C%20eval%20meta_tags%3Dcase(meta_tags!%3D%22%22%2Cmeta_tags%2C1%3D1%2C%22N%2FA%22)%20%0A%7C%20stats%20values(confidence_eiq)%20as%20confidence_eiq%2C%20values(created_at_eiq)%20as%20created_at_eiq%2C%20values(last_updated_at_eiq)%20as%20last_updated_at_eiq%2C%20values(entity_id)%20as%20entity_id%2C%20values(type_eiq)%20as%20%09type_eiq%2Cvalues(value_eiq)%20as%20value_eiq%2Cvalues(meta_tags)%20as%20meta_tags%20by%20id_eiq%0A|search%20meta_tags%3D$row.Tags$&amp;earliest=$field1.earliest$&amp;latest=$field1.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <title>Count of Observables by Confidence</title>
+      <chart>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$ 
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$ 
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq,confidence_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time) 
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| stats distinct_count(id_eiq) as "count" by confidence_eiq 
+| sort - count</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <table>
+        <search>
+          <query>| inputlookup eiq_ioc_list 
+| eval entity_id=trim(split(entity_id,",")) 
+| mvexpand entity_id 
+| join entity_id type=inner max=0 
+    [| inputlookup eiq_entities_list where $feed_token$ 
+    | eval observable_ids=trim(split(observable_ids,",")) 
+    | mvexpand observable_ids 
+    | eval meta_tags= trim(split(meta_tags,",")) 
+    | mvexpand meta_tags 
+    | search $token_meta$ 
+    | eval entity_id = _key 
+    | table feed_id ,entity_id,observable_ids,id_eiq,confidence_eiq ] 
+| addinfo 
+| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
+| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time) 
+| where _time&gt;= info_min_time and _time&lt;= info_max_time 
+| stats distinct_count(id_eiq) as "count" by confidence_eiq 
+| eval confidence_eiq=case(confidence_eiq!="",confidence_eiq,1=1,"N/A") 
+| sort - count
+| rename confidence_eiq AS Confidence</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">search?q=%7C%20inputlookup%20eiq_ioc_list%0A%7C%20addinfo%20%0A%7C%20eval%20_time%3Dstrptime(last_updated_at_eiq%2C%20%22%25Y-%25m-%25dT%25H%3A%25M%3A%25S.%256N%25%3Az%22)%20%0A%7C%20eval%20info_max_time%3D%20case(info_max_time%3D%22%2BInfinity%22%2Cstrftime(now()%2C%22%25s%22)%2C1%3D1%2Cinfo_max_time)%20%0A%7C%20where%20_time%3E%3D%20info_min_time%20and%20_time%3C%3D%20info_max_time%0A%7C%20search%20confidence_eiq%3D$row.Confidence$&amp;earliest=$field1.earliest$&amp;latest=$field1.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>
