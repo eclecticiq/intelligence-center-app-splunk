@@ -64,7 +64,7 @@
       <chart>
         <title>Select time on the graph for filtering</title>
         <search>
-          <query>| inputlookup eiq_alerts_list where (type_eiq=ipv4 $token_sourcetype$) $token_confidence$ 
+          <query>| inputlookup eiq_alerts_list where (type_eiq=ipv* $token_sourcetype$) $token_confidence$ 
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
