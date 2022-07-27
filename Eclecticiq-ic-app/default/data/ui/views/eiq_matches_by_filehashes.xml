@@ -62,7 +62,7 @@
       <chart>
         <title>Select time on the graph for filtering</title>
         <search>
-          <query>| inputlookup eiq_alerts_list where (type_eiq=hash-md5 $token_sourcetype$) $token_confidence$ 
+          <query>| inputlookup eiq_alerts_list where (type_eiq=hash-* $token_sourcetype$) $token_confidence$ 
 | eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) $token_meta$ 
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
@@ -88,7 +88,7 @@
       <chart>
         <title>Select time on the graph for filtering</title>
         <search>
-          <query>| inputlookup eiq_alerts_list where (type_eiq=hash-md5 $token_sourcetype$ ) $token_confidence$ 
+          <query>| inputlookup eiq_alerts_list where (type_eiq=hash-* $token_sourcetype$ ) $token_confidence$ 
 | eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) $token_meta$ 
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
@@ -109,7 +109,7 @@
       <table>
         <title>Click for more info below</title>
         <search>
-          <query>| inputlookup eiq_alerts_list where (type_eiq=hash-md5 $token_sourcetype$ ) $token_confidence$ 
+          <query>| inputlookup eiq_alerts_list where (type_eiq=hash-* $token_sourcetype$ ) $token_confidence$ 
 | eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) $token_meta$ 
 | addinfo 
 | eval time=strftime(event_time,"%Y-%m-%d %H:%M:%S") 
