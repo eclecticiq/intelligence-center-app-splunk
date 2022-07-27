@@ -97,8 +97,8 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | timechart count by src</query>
-          <earliest>$dd_time.earliest$</earliest>
-          <latest>$dd_time.latest$</latest>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <selection>
@@ -121,8 +121,8 @@
 | table time, event_host, event_sourcetype, value_eiq, confidence_eiq, event_time, event_index, event_hash, event_time_1 ,alert_field 
 | sort + time 
 | rename event_host AS "Host", event_sourcetype AS "Sourcetype", value_eiq AS "Observable Value", confidence_eiq AS "Confidence"</query>
-          <earliest>$dd_source_time.earliest$</earliest>
-          <latest>$dd_source_time.latest$</latest>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">20</option>
