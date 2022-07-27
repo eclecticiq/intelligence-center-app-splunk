@@ -2,7 +2,7 @@
   <label>Observables DB Info</label>
   <fieldset submitButton="false">
     <input type="time" token="field1">
-      <label></label>
+      <label>Time Range</label>
       <default>
         <earliest>-24h@h</earliest>
         <latest>now</latest>
