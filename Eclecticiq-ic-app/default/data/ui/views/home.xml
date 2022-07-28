@@ -138,6 +138,38 @@
         <option name="drilldown">none</option>
         <option name="refresh.display">progressbar</option>
       </single>
+      <single>
+        <title>Unknown</title>
+        <search>
+          <query>| inputlookup eiq_alerts_list
+| addinfo 
+| eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
+| table timestamp_eiq,confidence_eiq
+| eval _time=timestamp_eiq 
+| where confidence_eiq="unknown" 
+| timechart count by confidence_eiq</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x65a637","0x6db7c6","0xf7bc38","0xf58f39","0xd93f3c"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
     </panel>
   </row>
   <row>
@@ -210,7 +242,7 @@
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
-| search type_eiq=ipv4 
+| search type_eiq=ipv* 
 | timechart span=1d count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
