@@ -144,7 +144,7 @@
       </table>
     </panel>
     <panel>
-      <title>Alerts by Reciever Observable</title>
+      <title>Alerts by Receiver Observable</title>
       <chart>
         <title>Select time on the graph for filtering</title>
         <search>
