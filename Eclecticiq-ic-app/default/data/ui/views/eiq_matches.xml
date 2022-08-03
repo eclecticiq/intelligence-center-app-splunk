@@ -148,7 +148,7 @@
       <title>More info about $search_field_disply$ $search_value$</title>
       <table id="details" depends="$search_value$">
         <search>
-          <query>| inputlookup eiq_alerts_list where (value_eiq=$search_value$ AND event_time="$search_event_time$" AND event_hash="$search_event_hash$")
+          <query>| inputlookup eiq_alerts_list where (value_eiq="$search_value$" AND event_time="$search_event_time$" AND event_hash="$search_event_hash$")
 | lookup eiq_ioc_list value_eiq OUTPUTNEW created_at_eiq,last_updated_at_eiq,type_eiq,id_eiq,entity_id 
 | eval entity_id = trim(split(entity_id,",")) 
 | mvexpand entity_id 
