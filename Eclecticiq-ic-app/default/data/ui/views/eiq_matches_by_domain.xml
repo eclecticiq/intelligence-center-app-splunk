@@ -13,7 +13,7 @@
       <fieldForLabel>event_sourcetype</fieldForLabel>
       <fieldForValue>event_sourcetype</fieldForValue>
       <search>
-        <query>| inputlookup eiq_alerts_list where (alert_field=domain OR alert_field=url) | stats count by event_sourcetype | table event_sourcetype</query>
+        <query>| inputlookup eiq_alerts_list | stats count by event_sourcetype | table event_sourcetype</query>
         <earliest>$timeRange.earliest$</earliest>
         <latest>$timeRange.latest$</latest>
       </search>
