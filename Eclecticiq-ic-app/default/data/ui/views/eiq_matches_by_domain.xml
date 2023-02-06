@@ -13,7 +13,7 @@
       <fieldForLabel>event_sourcetype</fieldForLabel>
       <fieldForValue>event_sourcetype</fieldForValue>
       <search>
-        <query>| inputlookup eiq_alerts_list where (alert_field=domain OR alert_field=url) | stats count by event_sourcetype | table event_sourcetype</query>
+        <query>| inputlookup eiq_alerts_list where (type_eiq=domain OR type_eiq=url) | stats count by event_sourcetype | table event_sourcetype</query>
         <earliest>$timeRange.earliest$</earliest>
         <latest>$timeRange.latest$</latest>
       </search>
@@ -42,11 +42,13 @@
       <fieldForValue>val_tags</fieldForValue>
       <search>
         <query>| inputlookup eiq_alerts_list
-| table meta_tags_eiq 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) 
+| makemv tokenizer="([^\n]+),?" meta_tags_eiq
 | mvexpand meta_tags_eiq
 | dedup meta_tags_eiq
-| eval val_tags="meta_tags_eiq=\""+meta_tags_eiq+"\""</query>
+
+| eval meta_tags_eiq=  case(isnull(meta_tags_eiq), "N/A",meta_tags_eiq="","N/A" , 1=1, meta_tags_eiq) 
+| eval val_tags="meta_tags_eiq=\""+meta_tags_eiq+"\""
+| table meta_tags_eiq val_tags</query>
         <earliest>$timeRange.earliest$</earliest>
         <latest>$timeRange.latest$</latest>
       </search>
@@ -66,7 +68,7 @@
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) $token_meta$
+| eval meta_tags_eiq = case(isnull(meta_tags_eiq), "N/A", meta_tags_eiq="", "N/A", 1=1,meta_tags_eiq )$token_meta$ 
 | timechart count by confidence_eiq</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
@@ -89,7 +91,7 @@
         <title>Select time on the graph for filtering</title>
         <search>
           <query>| inputlookup eiq_alerts_list where (type_eiq=uri $token_sourcetype$ ) $token_confidence$ 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) $token_meta$ 
+| eval meta_tags_eiq = case(isnull(meta_tags_eiq), "N/A", meta_tags_eiq="", "N/A", 1=1,meta_tags_eiq ) $token_meta$ 
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
@@ -110,12 +112,12 @@
         <title>Click for more info below</title>
         <search>
           <query>| inputlookup eiq_alerts_list where (type_eiq=uri $token_sourcetype$ ) $token_confidence$ 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,","))$token_meta$ 
+| eval meta_tags_eiq = case(isnull(meta_tags_eiq), "N/A", meta_tags_eiq="", "N/A", 1=1,meta_tags_eiq ) $token_meta$ 
 | addinfo 
 | eval time=strftime(event_time,"%Y-%m-%d %H:%M:%S") 
-| table time, event_host, event_sourcetype, value_eiq, confidence_eiq, event_time, event_index, event_hash, event_time_1 
+| table time, event_host, event_sourcetype, value_eiq, confidence_eiq, event_time, event_index, event_hash, event_time_1, timestamp_eiq 
 | sort + time 
-| rename event_host AS "Host", event_sourcetype AS "Sourcetype", value_eiq AS "Observable Value", confidence_eiq AS "Confidence"</query>
+| rename event_host AS "Host", event_sourcetype AS "Sourcetype", value_eiq AS "Observable Value", confidence_eiq AS "Confidence", timestamp_eiq AS _timestamp_eiq</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -139,6 +141,7 @@
             <set token="search_event_index">$row.event_index$</set>
             <set token="search_event_hash">$row.event_hash$</set>
             <set token="search_event_sourcetype">$row.Sourcetype$</set>
+            <set token="timestamp_eiq">$row._timestamp_eiq$</set>
           </condition>
         </drilldown>
       </table>
@@ -149,7 +152,7 @@
         <title>Select time on the graph for filtering</title>
         <search>
           <query>| inputlookup eiq_alerts_list where (type_eiq=domain $token_sourcetype$ ) $token_confidence$ 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,","))$token_meta$ 
+| eval meta_tags_eiq = case(isnull(meta_tags_eiq), "N/A", meta_tags_eiq="", "N/A", 1=1,meta_tags_eiq )$token_meta$ 
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
@@ -171,12 +174,12 @@
         <title>Click for more info below</title>
         <search>
           <query>| inputlookup eiq_alerts_list where (type_eiq=domain $token_sourcetype$ ) $token_confidence$ 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,","))$token_meta$ 
+| eval meta_tags_eiq = case(isnull(meta_tags_eiq), "N/A", meta_tags_eiq="", "N/A", 1=1,meta_tags_eiq )$token_meta$ 
 | addinfo 
 | eval time=strftime(timestamp_eiq,"%Y-%m-%d %H:%M:%S") 
-| table time, event_host, event_sourcetype, value_eiq, confidence_eiq, event_time, event_index, event_hash, event_time_1 
+| table time, event_host, event_sourcetype, value_eiq, confidence_eiq, event_time, event_index, event_hash, event_time_1, timestamp_eiq 
 | sort + time 
-| rename event_host AS "Host", event_sourcetype AS "Sourcetype", value_eiq AS "Observable Value", confidence_eiq AS "Confidence"</query>
+| rename event_host AS "Host", event_sourcetype AS "Sourcetype", value_eiq AS "Observable Value", confidence_eiq AS "Confidence", timestamp_eiq AS _timestamp_eiq</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -200,6 +203,7 @@
             <set token="search_event_index">$row.event_index$</set>
             <set token="search_event_hash">$row.event_hash$</set>
             <set token="search_event_sourcetype">$row.Sourcetype$</set>
+            <set token="timestamp_eiq">$row._timestamp_eiq$</set>
           </condition>
         </drilldown>
       </table>
@@ -210,15 +214,29 @@
       <title>More info about $search_field_disply$ $search_value$</title>
       <table id="details" depends="$search_value$">
         <search>
-          <query>| inputlookup eiq_alerts_list where ( type_eiq=$search_field$ AND value_eiq=$search_value$ AND event_time="$search_event_time$" AND event_hash="$search_event_hash$") 
-| lookup eiq_ioc_list value_eiq OUTPUTNEW created_at_eiq,last_updated_at_eiq,type_eiq,id_eiq,entity_id 
-| eval entity_id = trim(split(entity_id,",")) 
-| mvexpand entity_id 
-| lookup eiq_entities_list entity_id OUTPUTNEW meta_estimated_threat_start_time,entity_type,entity_relevancy	entity_sources	entity_type	feed_id	meta_estimated_observed_time	meta_estimated_threat_start_time meta_source_reliability	meta_tags	meta_taxonomies	meta_tlp
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,",")) 
-| eval threat_end_time=replace(threat_end_time, "^(\d{4}\-\d{2}\-\d{2})(T)(\d{2}\:\d{2})(.+)","\1 \3") 
-| eval threat_start_time=replace(threat_start_time, "^(\d{4}\-\d{2}\-\d{2})(T)(\d{2}\:\d{2})(.+)","\1 \3") 
-| table event_time event_host event_sourcetype type_eiq alert_field value_eiq entity_title_eiq src dest threat_start_time threat_end_time confidence_eiq meta_tags_eiq value_url_eiq 
+          <query>| inputlookup eiq_alerts_list where ( type_eiq=$search_field$ AND value_eiq=$search_value$ AND event_time="$search_event_time$" AND event_hash="$search_event_hash$" AND timestamp_eiq="$timestamp_eiq$") 
+| join value_eiq type=left max=0 
+    [ search `observables_index` earliest=0 latest=now()
+    | sort - last_updated_at 
+    | dedup id 
+    | mvexpand entities{} 
+    | rename id as obs_id 
+    | table obs_id, value, confidence, type, entities{},last_updated_at 
+    | rename value as value_eiq ] 
+| eval entity_id = substr('entities{}', -36) 
+| join entity_id type=left max=0 
+    [ search `entity_index` earliest=0 latest=now()
+    | rename meta.tags{} as tags, sources{} as sources , data.title as title 
+    | eval tags = case(isnull(tags), "N/A", tags="", "N/A", 1=1,tags ) 
+    | rename id as entity_id 
+    | sort - last_updated_at 
+    | dedup entity_id 
+    | rename type as entity_type, outgoing_feeds{} as outgoing_feeds, meta.estimated_threat_end_time as meta_estimated_threat_end_time, meta.estimated_threat_start_time as meta_estimated_threat_start_time 
+    | table entity_id tags, sources, title, outgoing_feeds, entity_type, meta_estimated_threat_end_time, meta_estimated_threat_start_time] 
+| eval threat_end_time=replace(meta_estimated_threat_end_time, "^(\d{4}\-\d{2}\-\d{2})(T)(\d{2}\:\d{2})(.+)","\1 \3") 
+| eval threat_start_time=replace(meta_estimated_threat_start_time, "^(\d{4}\-\d{2}\-\d{2})(T)(\d{2}\:\d{2})(.+)","\1 \3") 
+| stats values(entity_id) as entity_id, values(value_eiq) as value_eiq, values(confidence_eiq) as confidence_eiq, values(type_eiq) as type_eiq, values(entities{}) as entities,values(last_updated_at) as last_updated_at, values(obs_id) as obs_id ,values(alert_source) as alert_source, values(meta_tags_eiq) as meta_tags_eiq, values(sources) as sources, values(title) as entity_title_eiq latest(event_time) as event_time , values(event_index) as index , values(event_sourcetype) as event_sourcetype, values(event_host) as event_host, values(outgoing_feeds) as outgoing_feeds , ,values(entity_type) as entity_type, values(eiq_src) as src, values(eiq_dest) as dest, values(threat_end_time) as threat_end_time, values(threat_start_time) as threat_start_time, values(alert_field) as alert_field, values(value_url_eiq) as value_url_eiq by event_hash
+| table event_time event_host event_sourcetype type_eiq alert_field value_eiq entity_title_eiq src dest threat_start_time threat_end_time confidence_eiq meta_tags_eiq 
 | rename event_time AS "Event Time" event_sourcetype AS "Sourcetype", event_host AS "Host", type_eiq AS "Observable Type", alert_field AS "Alert Field", value_eiq AS "Observable Value", entity_title_eiq AS "Observable Title", src AS "Event Src", dest AS "Event Dst", threat_start_time AS "Threat Start Time", threat_end_time AS "Threat End Time", confidence_eiq AS "Confidence", meta_tags_eiq AS "Tags" 
 | sort + "Event Time"</query>
           <earliest>$timeRange.earliest$</earliest>
@@ -229,6 +247,7 @@
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>

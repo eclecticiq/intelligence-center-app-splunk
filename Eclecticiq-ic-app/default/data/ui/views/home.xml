@@ -19,20 +19,7 @@
       <title>Total Count of Observables</title>
       <single>
         <search>
-          <query>| inputlookup eiq_ioc_list 
-| eval entity_id=trim(split(entity_id,",")) 
-| mvexpand entity_id 
-| join entity_id type=inner max=0 
-    [| inputlookup eiq_entities_list 
-    | eval observable_ids=trim(split(observable_ids,",")) 
-    | mvexpand observable_ids 
-    | eval entity_id = _key 
-    | table feed_id ,entity_id,observable_ids,id_eiq ] 
-| addinfo 
-| eval _time=strptime(last_updated_at_eiq, "%Y-%m-%dT%H:%M:%S.%6N%:z") 
-| eval info_max_time= case(info_max_time="+Infinity",strftime(now(),"%s"),1=1,info_max_time)
-| where _time&gt;= info_min_time and _time&lt;= info_max_time 
-| stats distinct_count(id_eiq)</query>
+          <query>`observables_index`  | stats distinct_count(id) as Count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -66,7 +53,7 @@
 | table timestamp_eiq,confidence_eiq
 | eval _time=timestamp_eiq 
 | where confidence_eiq="high" 
-| timechart count by confidence_eiq</query>
+| timechart span=1d count  |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -98,7 +85,7 @@
 | table timestamp_eiq,confidence_eiq
 | eval _time=timestamp_eiq 
 | where confidence_eiq="medium" 
-| timechart count by confidence_eiq</query>
+| timechart span=1d count  |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -129,14 +116,46 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | table timestamp_eiq,confidence_eiq
 | eval _time=timestamp_eiq 
-| where confidence_eiq="low" 
-| timechart count by confidence_eiq</query>
+| where confidence_eiq="low" OR confidence_eiq="safe"
+| timechart span=1d count  |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="drilldown">none</option>
         <option name="refresh.display">progressbar</option>
+      </single>
+      <single>
+        <title>Unknown</title>
+        <search>
+          <query>| inputlookup eiq_alerts_list
+| addinfo 
+| eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
+| table timestamp_eiq,confidence_eiq
+| eval _time=timestamp_eiq 
+| where confidence_eiq="unknown" 
+| timechart span=1d count  |streamstats sum(count) as count</query>
+          <earliest>$timeRange.earliest$</earliest>
+          <latest>$timeRange.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x65a637","0x6db7c6","0xf7bc38","0xf58f39","0xd93f3c"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
       </single>
     </panel>
   </row>
@@ -151,7 +170,7 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | search type_eiq=domain OR type_eiq=host 
-| timechart span=1d count</query>
+| timechart span=1d count |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -171,7 +190,7 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | search type_eiq=uri 
-| timechart span=1d count</query>
+| timechart span=1d count |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -191,7 +210,7 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | search type_eiq=hash* 
-| timechart span=1d count</query>
+| timechart span=1d count |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -211,7 +230,7 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | search type_eiq=ipv4 
-| timechart span=1d count</query>
+| timechart span=1d count |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -231,7 +250,7 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | search type_eiq=email 
-| timechart span=1d count</query>
+| timechart span=1d count |streamstats sum(count) as count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -272,7 +291,8 @@
 | addinfo 
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
-| timechart count by confidence_eiq</query>
+| eval confidence_eiq = if(confidence_eiq="safe", "low", confidence_eiq)
+| timechart  count by confidence_eiq</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
         </search>
@@ -288,22 +308,18 @@
       <title>Top Detected Observables by Types</title>
       <chart>
         <search>
-          <query>| inputlookup eiq_alerts_list 
-| eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
-| eval _time=timestamp_eiq 
-| addinfo 
-| stats count by type_eiq</query>
+          <query>`observables_index`  | stats distinct_count(id) as Count by type | sort - Count</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="charting.chart">pie</option>
+        <option name="charting.chart">column</option>
         <option name="charting.drilldown">none</option>
         <option name="refresh.display">progressbar</option>
       </chart>
     </panel>
     <panel>
-      <title>Top Detected Observables by Taxonomy/Tag</title>
+      <title>Top Detected Alerts by Taxonomy/Tag</title>
       <chart>
         <search>
           <query>| inputlookup eiq_alerts_list 
@@ -311,13 +327,13 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | table meta_tags_eiq 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,","))
+| mvexpand meta_tags_eiq
 | stats count by meta_tags_eiq</query>
           <earliest>$timeRange.earliest$</earliest>
           <latest>$timeRange.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="charting.chart">pie</option>
+        <option name="charting.chart">column</option>
         <option name="charting.drilldown">none</option>
         <option name="refresh.display">progressbar</option>
       </chart>
@@ -325,7 +341,7 @@
   </row>
   <row>
     <panel>
-      <title>Top Detected Observables and Metadata by Sourcetype</title>
+      <title>Top Detected Alerts and Metadata by Sourcetype</title>
       <table>
         <title>Click table row to show more information</title>
         <search>
@@ -334,8 +350,8 @@
 | eval timestamp_eiq=strptime(timestamp_eiq, "%Y-%m-%dT%H:%M:%S.%f")
 | eval _time=timestamp_eiq 
 | bin span=1h _time 
-| eval meta_tags_eiq = trim(split(meta_tags_eiq,","))
-| stats sparkline count, values(meta_tags_eiq) AS val_meta_eiq, values(type_eiq) AS val_type_eiq, dc(event_host) AS dc_eh by event_sourcetype 
+| mvexpand meta_tags_eiq
+| stats sparkline distinct_count(event_hash) as count, values(meta_tags_eiq) AS val_meta_eiq, values(type_eiq) AS val_type_eiq, dc(event_host) AS dc_eh by event_sourcetype 
 | table event_sourcetype, val_type_eiq, val_meta_eiq, dc_eh, sparkline, count 
 | sort - count 
 |eval _token_sourcetype = event_sourcetype
