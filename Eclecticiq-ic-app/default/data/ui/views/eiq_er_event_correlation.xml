@@ -1,0 +1,137 @@
+<form version="1.1">
+  <label>EIQ ER event correlation</label>
+  <init>
+    <eval token="time_tok.earliest">$event_time$-$time_data$</eval>
+    <eval token="time_tok.latest">$event_time$+$time_data$</eval>
+    <eval token="label_earliest">strftime($time_tok.earliest$,"%Y-%m-%d %H:%M:%S")</eval>
+    <eval token="label_latest">case($time_tok.latest$&lt;now(), strftime($time_tok.latest$,"%Y-%m-%d %H:%M:%S"),1=1,strftime(now(),"%Y-%m-%d %H:%M:%S") )</eval>
+    <eval token="form.ic_installed_dd">case($ic_installed$&gt;0, "true")</eval>
+    <eval token="form.ic_not_installed_dd">case($ic_installed$==0, "true")</eval>
+  </init>
+  <search id="base1">
+    <query>`eiq_er_index`| eval hash=sha512(_raw) | where pid="$eid$" or process_guid="$eid$" or hash="$event_hash$" | lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash observable_id value_eiq confidence_eiq sighting | eval sighting=case(isnull(sighting), 0, 1=1, sighting)|eval _time=time | stats dc(_raw) as count by _time,query_name,hash,sighting | eval {query_name}=count | append [ search `eiq_er_index`| eval hash=sha512(_raw) | where pid="$eid$" or process_guid="$eid$" or hash="$event_hash$" | lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash observable_id value_eiq confidence_eiq sighting | eval sighting=case(isnull(sighting), 0, 1=1, sighting)|eval _time=time | stats dc(_raw) as count by _time,query_name,hash,sighting | eval count= null ] </query>
+    <earliest>$time_tok.earliest$</earliest>
+    <latest>$time_tok.latest$</latest>
+  </search>
+  <fieldset submitButton="false">
+    <input type="dropdown" token="time_data">
+      <label>Show data of ± Timerange</label>
+      <choice value="600">10 minutes</choice>
+      <choice value="1800">30 minutes</choice>
+      <choice value="3600">1 hour</choice>
+      <choice value="18000">5 hours</choice>
+      <choice value="36000">10 hours</choice>
+      <choice value="86400">1 day</choice>
+      <choice value="432000">5 days</choice>
+      <choice value="864000">10 days</choice>
+      <change>
+        <eval token="time_tok.earliest">$event_time$-$time_data$</eval>
+        <eval token="time_tok.latest">$event_time$+$time_data$</eval>
+        <eval token="label_earliest">strftime($time_tok.earliest$,"%Y-%m-%d %H:%M:%S")</eval>
+        <eval token="label_latest">case($time_tok.latest$&lt;now(), strftime($time_tok.latest$,"%Y-%m-%d %H:%M:%S"),1=1,strftime(now(),"%Y-%m-%d %H:%M:%S") )</eval>
+      </change>
+      <default>1800</default>
+      <initialValue>1800</initialValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel depends="$eid$">
+      <title>Event - GUID/PID/Path/Host Name($eid$)</title>
+      <table id="details">
+        <search>
+          <query>`eiq_er_index` sourcetype="eclecticiq:er:json"  | rex field=_raw "[\"|']action[\"|']\s*:\s*[\"|\'](?&lt;Action1&gt;[\w+|\s+|\d+]*)[\"|']" | eval Action = case(isnotnull(Action1), Action1, 1=1, "-") | where pid="$eid$" or process_guid="$eid$" or path="$eid$" or computer_name="$eid$"   $checkbox$ | search _event_hash=$event_hash$| fillnull value="-" "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name", Action | sort - _eventtime</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="count">3</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$form.ic_installed_dd$">
+      <title>Related events and observables - GUID/PID/Path/Host Name($eid$)</title>
+      <table>
+        <search>
+          <query>`eiq_er_index` sourcetype="eclecticiq:er:json" 
+| rex field=_raw "[\"|']action[\"|']\s*:\s*[\"|\'](?&lt;Action1&gt;[\w+|\s+|\d+]*)[\"|']" 
+| eval Action = case(isnotnull(Action1), Action1, 1=1, "-") 
+| eval hash=sha512(_raw) 
+| where process_guid="$eid$" or pid="$eid$" or path="$eid$" AND computer_name="$eid$" or hash="$event_hash$" 
+| lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash observable_id value_eiq type_eiq confidence_eiq sighting 
+| eval sighting=case(isnull(sighting), 0, 1=1, sighting) 
+| fields - _raw hash punct linecount eventtype 
+| rename value_eiq as "Observable Value", type_eiq as "Observable Type", confidence_eiq as Maliciousness, sighting as Sighting, computer_name as "Host Name", ip_address as "Host IP Address", pid as PID, process_guid as "Process GUID", path as Path,platform as Platform 
+| eval "Created Time"=strftime(_time, "%a,%d %b %Y %H:%M:%S") 
+| fillnull value="-" Maliciousness | fillnull value="-" "Observable Value" | fillnull value="-" Sighting
+| stats values("Observable Type") as "Observable Type", values("Host Name") as "Host Name",values("Host IP Address") as "Host IP Address",values(Platform) as Platform, values(PID) as PID, values("Process GUID") as "Process GUID", values(Path) as Path, values(Action) as Action, by "Created Time", Maliciousness, "Observable Value", Sighting
+| table "Observable Value", "Observable Type", Maliciousness, "Sighting", "Host Name", "Host IP Address", "Platform", "PID", "Process GUID", "Path", "Action", "Created Time" 
+| fillnull value="-" "Observable Value" "Observable Type" Maliciousness Sighting, Action, "Host Name", "Host IP Address", PID, "Process GUID", Path, Platform 
+| sort -"Created Time"</query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="count">6</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="totalsRow">false</option>
+        <format type="color" field="Maliciousness">
+          <colorPalette type="map">{"low":#006D9C,"high":#62B3B2,"medium":#708794,"unknown":#F8BE34}</colorPalette>
+        </format>
+        <format type="color" field="Sighting">
+          <colorPalette type="expression">if(value&gt;0,"#DC4E41", "")</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$form.ic_installed_dd$">
+      <title>Event timeline with GUID/PID/Path/Host Name($eid$)  between ($label_earliest$ and $label_latest$) for which the alert is created</title>
+      <chart>
+        <search base="base1">
+          <query>| where sighting=1 | sort 0 _time,query_name | fields - count ,query_name, sighting</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"0":#b30000, "1":#032078}</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=%60eiq_er_index%60%7C%20eval%20hash%3Dsha512(_raw)%20%7C%20where%20(pid%3D%22$eid$%22%20or%20process_guid%3D%22$eid$%22%20)and%20hash%3D%22$row.hash$%22&amp;earliest=$time_tok.earliest$&amp;latest=$time_tok.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Event timeline with GUID/PID/Path/Host Name($eid$)  between ($label_earliest$ and $label_latest$) for which the alert is not  created</title>
+      <chart>
+        <search base="base1">
+          <query>| where sighting!=1 | sort 0 _time,query_name | fields - count ,query_name, sighting</query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.resultTruncationLimit">10000000000</option>
+        <option name="charting.data.count">10000000000</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=%60eiq_er_index%60%7C%20eval%20hash%3Dsha512(_raw)%20%7C%20where%20(pid%3D%22$eid$%22%20or%20process_guid%3D%22$eid$%22%20)and%20hash%3D%22$row.hash$%22&amp;earliest=$time_tok.earliest$&amp;latest=$time_tok.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+</form>
