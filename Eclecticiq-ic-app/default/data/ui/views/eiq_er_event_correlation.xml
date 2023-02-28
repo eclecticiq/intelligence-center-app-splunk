@@ -39,7 +39,7 @@
       <title>Event - GUID/PID/Path/Host Name($eid$)</title>
       <table id="details">
         <search>
-          <query>`eiq_er_index` sourcetype="eclecticiq:er:json"  | rex field=_raw "[\"|']action[\"|']\s*:\s*[\"|\'](?&lt;Action1&gt;[\w+|\s+|\d+]*)[\"|']" | eval Action = case(isnotnull(Action1), Action1, 1=1, "-") | where pid="$eid$" or process_guid="$eid$" or path="$eid$" or computer_name="$eid$"   $checkbox$ | search _event_hash=$event_hash$| fillnull value="-" "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name", Action | sort - _eventtime</query>
+          <query>`eiq_er_index` sourcetype="eclecticiq:er:json"  | rex field=_raw "[\"|']action[\"|']\s*:\s*[\"|\'](?&lt;Action1&gt;[\w+|\s+|\d+]*)[\"|']" | eval Action = case(isnotnull(Action1), Action1, 1=1, "-") | where pid="$eid$" or process_guid="$eid$" or path="$eid$" or computer_name="$eid$"   $checkbox$ | search _event_hash=$event_hash$ | fillnull value="-" "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name", Action | sort - _eventtime</query>
           <earliest>$time_tok.earliest$</earliest>
           <latest>$time_tok.latest$</latest>
         </search>
@@ -59,13 +59,11 @@
 | eval Action = case(isnotnull(Action1), Action1, 1=1, "-") 
 | eval hash=sha512(_raw) 
 | where process_guid="$eid$" or pid="$eid$" or path="$eid$" AND computer_name="$eid$" or hash="$event_hash$" 
-| lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash observable_id value_eiq type_eiq confidence_eiq sighting 
+| join type=left max=0 hash [|inputlookup eiq_alerts_list | rename event_hash as hash| table hash observable_id value_eiq type_eiq confidence_eiq sighting ]
 | eval sighting=case(isnull(sighting), 0, 1=1, sighting) 
 | fields - _raw hash punct linecount eventtype 
 | rename value_eiq as "Observable Value", type_eiq as "Observable Type", confidence_eiq as Maliciousness, sighting as Sighting, computer_name as "Host Name", ip_address as "Host IP Address", pid as PID, process_guid as "Process GUID", path as Path,platform as Platform 
 | eval "Created Time"=strftime(_time, "%a,%d %b %Y %H:%M:%S") 
-| fillnull value="-" Maliciousness | fillnull value="-" "Observable Value" | fillnull value="-" Sighting
-| stats values("Observable Type") as "Observable Type", values("Host Name") as "Host Name",values("Host IP Address") as "Host IP Address",values(Platform) as Platform, values(PID) as PID, values("Process GUID") as "Process GUID", values(Path) as Path, values(Action) as Action, by "Created Time", Maliciousness, "Observable Value", Sighting
 | table "Observable Value", "Observable Type", Maliciousness, "Sighting", "Host Name", "Host IP Address", "Platform", "PID", "Process GUID", "Path", "Action", "Created Time" 
 | fillnull value="-" "Observable Value" "Observable Type" Maliciousness Sighting, Action, "Host Name", "Host IP Address", PID, "Process GUID", Path, Platform 
 | sort -"Created Time"</query>
