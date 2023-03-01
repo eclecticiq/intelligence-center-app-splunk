@@ -211,7 +211,7 @@
         <option name="count">3</option>
         <option name="drilldown">row</option>
         <drilldown>
-          <link target="_blank">/app/Eclecticiq-ic-app/eiq_er_event_correlation?earliest_tok=$earliest$&amp;latest_tok=$latest$&amp;event_time=$row._eventtime$&amp;event_hash=$row._event_hash$&amp;ic_installed=$ic_installed$&amp;eid=$row._pid$&amp;checkbox=$checkbox$&amp;host_name=$row.Host%20Name$</link>
+          <link target="_blank">/app/Eclecticiq-ic-app/eiq_er_event_correlation?earliest_tok=$earliest$&amp;latest_tok=$latest$&amp;event_time=$row._eventtime$&amp;event_hash=$row._event_hash$&amp;ic_installed=1&amp;eid=$row._pid$&amp;checkbox=$checkbox$&amp;host_name=$row.Host%20Name$</link>
         </drilldown>
       </table>
     </panel>
