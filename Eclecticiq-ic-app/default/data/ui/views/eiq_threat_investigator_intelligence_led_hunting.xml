@@ -1,0 +1,233 @@
+<form version="1.1" theme="light">
+  <label>EIQ Threat Investigator - Intelligence led hunting</label>
+  <fieldset submitButton="false">
+    <input type="time" token="field1">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="text" token="search">
+      <label>Search</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="dropdown" token="ic_installed" depends="$nevershow$">
+      <label>Is IC installed</label>
+      <fieldForLabel>count</fieldForLabel>
+      <fieldForValue>count</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>| rest /services/data/transforms/lookups | table eai:acl.app filename title fields_list id | rename eai:acl.app as App, filename as "Lookup File", title as Title, fields_list as "Fields", id as Endpoint| search App="TA-eclecticiq" Title="eiq_alerts_list" | stats count</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Matching EIQ IC Observables</title>
+      <table>
+        <search>
+          <query>| inputlookup append=true eiq_alerts_list | eval _time=strptime(event_time, "%s")| addinfo |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(), 1=1,info_max_time )| where _time&gt;=info_min_time AND _time&lt;=info_max_time  | rename value_eiq as  "Observable Value", confidence_eiq as Maliciousness, type_eiq as "Observable Type"  |stats Count as "Number of Alerts" by "Observable Value", "Observable Type", "Maliciousness"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>ER events matching IC observable types</title>
+      <chart>
+        <search>
+          <query>| inputlookup append=true  eiq_alerts_list| eval _time=strptime(event_time, "%s")| addinfo | eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(),1=1,info_max_time)| where _time&gt;=info_min_time AND _time&lt;=info_max_time | where event_sourcetype="eclecticiq:er:json" | rename type_eiq as "Observable Type"  |stats count by "Observable Type" | sort - count</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.05</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="Observable_type">$row.Observable Type$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>ER events (Top 10) matching IC observables</title>
+      <chart>
+        <search>
+          <query>| inputlookup append=true  eiq_alerts_list | eval _time=strptime(event_time, "%s")| addinfo |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(),1=1,info_max_time)| where _time&gt;=info_min_time AND _time&lt;=info_max_time| where event_sourcetype="eclecticiq:er:json"  | rename value_eiq as  "Observable Value" , confidence_eiq as Maliciousness, type_eiq as "Observable Type"  |stats count by "Observable Value", "Observable Type", "Maliciousness", event_sourcetype | eval redCount = if(count&gt;100,count,0)
+| eval yellowCount = if(count&lt;=100 AND count&gt;1,count,0)
+| eval greenCount = if(count&lt;=1, count, 0)
+| sort - count | fields - count | head 10</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">log</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"redCount":0xFF0000,"yellowCount":0xFFFF00, "greenCount":0x73A550}</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="Observable_Value">$row.Observable Value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>ER events matching IC observable maliciousness</title>
+      <chart>
+        <search>
+          <query>| inputlookup append=true  eiq_alerts_list| eval _time=strptime(event_time, "%s")| addinfo |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(),1=1,info_max_time)| where _time&gt;=info_min_time AND _time&lt;=info_max_time | where event_sourcetype="eclecticiq:er:json" | rename confidence_eiq as Maliciousness |stats count by Maliciousness | sort - count</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"low":#006D9C,"high":#62B3B2,"medium":#708794,"unknown":#F8BE34}</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <drilldown>
+          <set token="Maliciousness">$row.Maliciousness$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>All events (Top 10) matching  IC observables</title>
+      <chart>
+        <search>
+          <query>| inputlookup append=true eiq_alerts_list| eval _time=strptime(event_time, "%s")| addinfo  |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(),1=1,info_max_time)| where _time&gt;=info_min_time AND _time&lt;=info_max_time  | rename value_eiq as  "Observable Value" , confidence_eiq as Maliciousness, type_eiq as "Observable Type"  |stats count by "Observable Value", "Observable Type", Maliciousness, event_sourcetype | sort - count | head 10</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.scale">log</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Events by Observable Type</title>
+      <table id="piechart" depends="$Observable_type$">
+        <search>
+          <query>| inputlookup eiq_alerts_list | eval _time=strptime(event_time, "%s")| addinfo |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(), 1=1,info_max_time )| where _time&gt;=info_min_time AND _time&lt;=info_max_time | where type_eiq="$Observable_type$" | where event_sourcetype="eclecticiq:er:json"  | rename value_eiq as  "Observable Value" , confidence_eiq as Maliciousness, entity_title_eiq as "Sighting title", type_eiq as "Observable Type", sighting as Sighting , event_host as Host, event_index as Index, event_sourcetype as Sourcetype, meta_tags_eiq as Tags, timestamp_eiq as Time | table  Maliciousness, "Observable Value", "Observable Type", Host, Index, Sourcetype, Tags, Time | fillnull value="-" Tags</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Events by Observable Value</title>
+      <table id="piechart2" depends="$Observable_Value$">
+        <search>
+          <query>| inputlookup eiq_alerts_list | eval _time=strptime(event_time, "%s")| addinfo |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(), 1=1,info_max_time ) | where _time&gt;=info_min_time AND _time&lt;=info_max_time| where value_eiq="$Observable_Value$"| where event_sourcetype="eclecticiq:er:json"| rename value_eiq as  "Observable Value" , confidence_eiq as Maliciousness, entity_title_eiq as "Sighting title", type_eiq as "Observable Type", sighting as Sighting , event_host as Host, event_index as Index, event_sourcetype as Sourcetype, meta_tags_eiq as Tags, timestamp_eiq as Time| table  Maliciousness, "Observable Value", "Observable Type", Host, Index, Sourcetype, Tags, Time | fillnull value="-" Tags</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Events by Maliciousness</title>
+      <table id="piechart1" depends="$Maliciousness$">
+        <search>
+          <query>| inputlookup eiq_alerts_list | eval _time=strptime(event_time, "%s")| addinfo |eval info_max_time=case(Tostring(info_max_time)="+Infinity", now(), 1=1,info_max_time )| where _time&gt;=info_min_time AND _time&lt;=info_max_time| where confidence_eiq="$Maliciousness$" | where event_sourcetype="eclecticiq:er:json" | rename value_eiq as  "Observable Value" , confidence_eiq as Maliciousness, entity_title_eiq as "Sighting title", type_eiq as "Observable Type", sighting as Sighting , event_host as Host, event_index as Index, event_sourcetype as Sourcetype, meta_tags_eiq as Tags, timestamp_eiq as Time | table  Maliciousness, "Observable Value", "Observable Type", Host, Index, Sourcetype, Tags, Time | fillnull value="-" Tags, Host, Index</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>EIQ ER events</title>
+      <input type="dropdown" token="checkbox">
+        <label>Show ER events with an IC observable match</label>
+        <choice value="| eval hash=sha512(_raw) | lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash value_eiq type_eiq confidence_eiq | search event_hash =* | eval _pid=coalesce(process_guid, pid, path,computer_name),_eventtime=_time, _event_hash=hash ,  _raw2=_raw | strcat process_guid pid value_eiq type_eiq  confidence_eiq _pid _eventtime _event_hash _raw1 | eval &quot;Process GUID/Pid&quot;=case(isnotnull(process_guid), process_guid, 1=1, pid)  | rename value_eiq as &quot;Observable Value&quot;, type_eiq as &quot;Observable Type&quot;, confidence_eiq as Maliciousness, computer_name as &quot;Host Name&quot;, ip_address as &quot;Host IP Address&quot;, platform as Platform| eval &quot;Created Time&quot;=strftime(_time, &quot;%a,%d %b %Y %H:%M:%S&quot;) | eval &quot;Path/Process Name&quot;=case(isnotnull(path), path, 1=1, process_name) | table &quot;Observable Value&quot;, &quot;Observable Type&quot;, Maliciousness, &quot;Host Name&quot;,&quot;Host IP Address&quot;, Platform, &quot;Process GUID/Pid&quot;, &quot;Path/Process Name&quot; , Action, &quot;Created Time&quot; _pid _eventtime _event_hash _raw1 _raw2">Yes</choice>
+        <choice value="| eval hash=sha512(_raw) | eval _pid=coalesce(process_guid, pid, path,computer_name),_eventtime=_time, _event_hash=hash , _raw1=pid.path.process_guid.Os._pid._eventtime._event_hash  , _raw2=_raw | eval &quot;Process GUID/Pid&quot;=case(isnotnull(process_guid), process_guid, 1=1, pid) | rename computer_name as &quot;Host Name&quot;, ip_address as &quot;Host IP Address&quot;, platform as Platform| eval &quot;Created Time&quot;=strftime(_time, &quot;%a,%d %b %Y %H:%M:%S&quot;) | eval &quot;Path/Process Name&quot;=case(isnotnull(path), path, 1=1, process_name) | table &quot;Host Name&quot;, &quot;Host IP Address&quot;, Platform, &quot;Process GUID/Pid&quot;, &quot;Path/Process Name&quot; , Action, &quot;Created Time&quot; _pid _eventtime _event_hash _raw1 _raw2">No</choice>
+        <change>
+          <unset token="eid"></unset>
+        </change>
+        <default>| eval hash=sha512(_raw) | lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash value_eiq type_eiq confidence_eiq | search event_hash =* | eval _pid=coalesce(process_guid, pid, path,computer_name),_eventtime=_time, _event_hash=hash ,  _raw2=_raw | strcat process_guid pid value_eiq type_eiq  confidence_eiq _pid _eventtime _event_hash _raw1 | eval "Process GUID/Pid"=case(isnotnull(process_guid), process_guid, 1=1, pid)  | rename value_eiq as "Observable Value", type_eiq as "Observable Type", confidence_eiq as Maliciousness, computer_name as "Host Name", ip_address as "Host IP Address", platform as Platform| eval "Created Time"=strftime(_time, "%a,%d %b %Y %H:%M:%S") | eval "Path/Process Name"=case(isnotnull(path), path, 1=1, process_name) | table "Observable Value", "Observable Type", Maliciousness, "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name" , Action, "Created Time" _pid _eventtime _event_hash _raw1 _raw2</default>
+        <initialValue>| eval hash=sha512(_raw) | lookup eiq_alerts_list event_hash as hash OUTPUTNEW event_hash value_eiq type_eiq confidence_eiq | search event_hash =* | eval _pid=coalesce(process_guid, pid, path,computer_name),_eventtime=_time, _event_hash=hash ,  _raw2=_raw | strcat process_guid pid value_eiq type_eiq  confidence_eiq _pid _eventtime _event_hash _raw1 | eval "Process GUID/Pid"=case(isnotnull(process_guid), process_guid, 1=1, pid)  | rename value_eiq as "Observable Value", type_eiq as "Observable Type", confidence_eiq as Maliciousness, computer_name as "Host Name", ip_address as "Host IP Address", platform as Platform| eval "Created Time"=strftime(_time, "%a,%d %b %Y %H:%M:%S") | eval "Path/Process Name"=case(isnotnull(path), path, 1=1, process_name) | table "Observable Value", "Observable Type", Maliciousness, "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name" , Action, "Created Time" _pid _eventtime _event_hash _raw1 _raw2</initialValue>
+      </input>
+      <table>
+        <search>
+          <query>`eiq_er_index` sourcetype="eclecticiq:er:json"  | rex field=_raw "[\"|']action[\"|']\s*:\s*[\"|\'](?&lt;Action1&gt;[\w+|\s+|\d+]*)[\"|']" | eval Action = case(isnotnull(Action1), Action1, 1=1, "-") $checkbox$  | search _raw1="*$search$*" OR _raw2="*$search$*" | fillnull value="-" "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name", Action | sort - _eventtime</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="event_hash">$row._event_hash$</set>
+          <set token="host">$row.host_identifier$</set>
+          <set token="eid">$row._pid$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Detailed info of GUID/PID/Path/Host Name( $eid$)</title>
+      <table id="details" depends="$eid$">
+        <search>
+          <query>`eiq_er_index` sourcetype="eclecticiq:er:json"  | rex field=_raw "[\"|']action[\"|']\s*:\s*[\"|\'](?&lt;Action1&gt;[\w+|\s+|\d+]*)[\"|']" | eval Action = case(isnotnull(Action1), Action1, 1=1, "-") | where pid="$eid$" or process_guid="$eid$" or path="$eid$" or computer_name="$eid$"   $checkbox$| search _raw1="*$search$*" OR _raw2="*$search$*"| search _event_hash=$event_hash$| fillnull value="-" "Host Name","Host IP Address", Platform, "Process GUID/Pid", "Path/Process Name", Action | sort - _eventtime</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">3</option>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">/app/Eclecticiq-ic-app/eiq_er_event_correlation?earliest_tok=$earliest$&amp;latest_tok=$latest$&amp;event_time=$row._eventtime$&amp;event_hash=$row._event_hash$&amp;ic_installed=1&amp;eid=$row._pid$&amp;checkbox=$checkbox$&amp;host_name=$row.Host%20Name$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Raw Splunk Event</title>
+      <event id="details2" depends="$eid$">
+        <search>
+          <query>`eiq_er_index` sourcetype="eclecticiq:er:json" | eval hash=sha512(_raw) | where hash="$event_hash$" | where process_guid="$eid$" or pid="$eid$" or path="$eid$" or computer_name="$eid$"  $checkbox$</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="list.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </event>
+    </panel>
+  </row>
+</form>
